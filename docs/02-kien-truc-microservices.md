@@ -34,7 +34,9 @@ flowchart TB
 
     SMTP["✉️ SMTP / MailHog<br/>:1025 · UI :8025<br/><i>external service</i>"]
 
-    WEB -->|HTTPS/JSON<br/>/api/v1/**| GW
+    JAEGER["Jaeger :16686<br/>OpenTelemetry / OTLP HTTP"]
+    GW & AUTH & ACC & TUI & PAY & OTP & NOTI -.->|OTLP spans| JAEGER
+    WEB -->|HTTP/JSON<br/>/api/v1/**| GW
     GW -->|REST| AUTH
     GW -->|REST| ACC
     GW -->|REST| TUI
@@ -91,9 +93,17 @@ Toàn bộ giao tiếp là **REST/JSON đồng bộ trên HTTP** trong mạng n�
 | otp-service | notification-service | `POST /internal/notifications/email` | Gửi mã OTP | ✔ |
 | notification-service | SMTP (MailHog) | giao thức SMTP | Gửi email thật | ✔ |
 
-**Bảo mật lời gọi nội bộ.** Endpoint `/internal/*` yêu cầu header `X-Internal-Token`; gateway từ chối mọi URI chứa `internal`, nên nhóm API này không thể chạm tới từ ngoài cluster.
+**Bảo mật lời gọi nội bộ.** Endpoint `/internal/*` yêu cầu header `X-Internal-Token`; gateway chặn đường dẫn này trên cổng 8080. Compose vẫn mở cổng 8001–8006 trực tiếp ra host để dev/demo, nên chặn tại gateway không thay thế cô lập mạng. Không triển khai cấu hình demo và token mặc định lên mạng công cộng.
 
-**Truy vết.** `X-Request-Id` sinh ở gateway, truyền qua mọi lời gọi và ghi vào log JSON của tất cả service, đồng thời lưu vào bảng `payment_events`. Một giao dịch có thể tra cứu xuyên 4 service bằng một id duy nhất.
+**Truy vết phân tán bằng OpenTelemetry.** Điểm `instrument(app, service)` dùng chung gắn instrumentation FastAPI và HTTPX cho gateway cùng sáu service. W3C `traceparent` truyền qua các lời gọi REST; server/client span ghi quan hệ cha–con, thời gian và trạng thái HTTP. `BatchSpanProcessor` xuất OTLP HTTP tới Jaeger, giao diện ở <http://localhost:16686>. Không thu body chứa OTP, mật khẩu hay JWT vào span.
+
+`X-Request-Id` vẫn được truyền và lưu vào `payment_events.request_id`. JSON log bổ sung `trace_id` và `span_id` để chuyển từ log sang waterfall Jaeger. Các request tạo payment và xác nhận OTP là các trace riêng; `payment_id` liên kết chúng ở mức nghiệp vụ. Job nền tạo span `payment.reconcile` riêng với payment ID/action, không giả định vẫn có context của request trước crash.
+
+```bash
+docker compose logs --no-log-prefix | grep '<request-id-hoặc-trace-id>'
+```
+
+Jaeger dùng bộ nhớ cho demo: restart làm mất trace. Tracing export bất đồng bộ, collector không phải dependency nghiệp vụ; log và sổ cái vẫn hoạt động khi Jaeger không sẵn sàng. Chưa instrument SQL/SMTP hay lưu trữ trace dài hạn.
 
 ---
 
@@ -185,8 +195,8 @@ Giao dịch tài chính cần một nơi duy nhất trả lời được câu h�
 ### Vì sao có API Gateway?
 - Client chỉ cần biết **một** địa chỉ, không phải 6 cổng.
 - Xác thực JWT tập trung, fail-fast trước khi chạm tới nghiệp vụ.
-- Là nơi duy nhất chặn `/internal/*` — biên giới an ninh rõ ràng.
-- Nơi tự nhiên để cắm rate-limit, tracing, logging tập trung về sau.
+- Chặn `/internal/*` trên đường vào của web; từng service vẫn kiểm tra token nội bộ.
+- Đã tích hợp tracing OpenTelemetry và log JSON; có thể bổ sung rate-limit tập trung.
 
 Các service **vẫn tự verify JWT** (zero-trust) chứ không tin header do gateway gắn vào, phòng trường hợp ai đó gọi thẳng service trong mạng nội bộ.
 
@@ -196,7 +206,7 @@ Các service **vẫn tự verify JWT** (zero-trust) chứ không tin header do g
 |---|---|---|
 | REST đồng bộ cho saga | payment-service phụ thuộc tính sẵn sàng của 4 service | Tải cao → chuyển bước gửi mail sang message broker + outbox pattern |
 | Một Postgres instance, 6 database | Vẫn là một điểm hỏng chung ở tầng hạ tầng | Production → tách instance/cluster riêng cho từng service |
-| Bù trừ bằng hoàn tiền tức thì | Có khoảnh khắc tiền đã trừ nhưng chưa gạch nợ (< 1 giây) | Cần đảm bảo tuyệt đối → thêm job đối soát các payment `PROCESSING` treo |
+| Saga + job đối soát | Nhất quán cuối cùng; phục hồi phụ thuộc service trở lại; giữ connection khi khóa payment qua HTTP | Tải cao hoặc remote RPC trì hoãn dài → lease/fencing, outbox và vận hành đối soát |
 | JWT dùng shared secret HS256 | Mọi service phải biết secret | Nhiều team → chuyển RS256, service chỉ giữ public key |
 | Thư viện `common/` dùng chung | Thay đổi common ảnh hưởng nhiều service | Tách thành package versioned, mỗi service nâng cấp độc lập |
 
@@ -218,11 +228,13 @@ flowchart LR
         S6["notification :8006"]
         PG[("postgres :5433→5432<br/>volume pgdata")]
         MH["mailhog :1025 / :8025"]
+        J["jaeger :16686<br/>OTLP :4318 nội mạng"]
     end
     W --> G --> S1 & S2 & S3 & S4
     S4 --> S2 & S3 & S5 & S6
     S5 --> S6 --> MH
     S1 & S2 & S3 & S4 & S5 & S6 --- PG
+    G & S1 & S2 & S3 & S4 & S5 & S6 -.->|OTLP| J
 ```
 
 Mỗi service là **một container độc lập**, cùng một `Dockerfile` tham số hoá bằng `--build-arg SERVICE`.

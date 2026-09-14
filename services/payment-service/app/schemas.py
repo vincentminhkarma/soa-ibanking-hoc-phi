@@ -50,4 +50,5 @@ class PaymentEventItem(BaseModel):
     step: str
     status: str
     detail: str | None = None
+    request_id: str | None = Field(default=None, description="Correlation id để tra log xuyên service")
     created_at: str | None = None

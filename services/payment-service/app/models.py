@@ -61,6 +61,9 @@ class Payment(Base):
 
     otp_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Thời điểm vào PROCESSING — job đối soát dựa vào đây để biết giao dịch treo
+    # bao lâu, thay vì created_at (người dùng có thể ngồi nhập OTP rất lâu).
+    processing_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     def as_dict(self) -> dict:

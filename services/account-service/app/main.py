@@ -55,15 +55,31 @@ def _lock_account(db: Session, user_id: str) -> Account:
     return account
 
 
-def _find_by_reference(db: Session, reference: str) -> LedgerEntry | None:
-    return db.scalar(select(LedgerEntry).where(LedgerEntry.reference == reference))
+def _replay_of(db: Session, account: Account, req: MoveMoneyRequest, direction: str) -> LedgerEntry | None:
+    """Bút toán cũ được coi là replay chỉ khi trùng cả tài khoản, chiều lẫn số tiền.
+
+    `reference` UNIQUE trên toàn hệ thống, nên tra theo mỗi reference có thể bắt
+    trúng bút toán của tài khoản khác rồi báo thành công giả: job đối soát sẽ
+    chốt "đã hoàn tiền" cho một giao dịch thực tế chưa hề được hoàn.
+    """
+    entry = db.scalar(select(LedgerEntry).where(LedgerEntry.reference == req.reference))
+    if entry is None:
+        return None
+    if entry.account_id != account.id or entry.direction != direction or entry.amount != req.amount:
+        raise APIError(
+            409,
+            "REFERENCE_CONFLICT",
+            "Reference này đã thuộc về một bút toán khác, không thể dùng lại.",
+            {"reference": req.reference},
+        )
+    return entry
 
 
 def _apply(db: Session, user_id: str, req: MoveMoneyRequest, direction: str) -> MoveMoneyResponse:
     account = _lock_account(db, user_id)
 
     # Idempotency: cùng reference => trả lại kết quả cũ, không ghi sổ lần hai.
-    existing = _find_by_reference(db, req.reference)
+    existing = _replay_of(db, account, req, direction)
     if existing:
         return MoveMoneyResponse(
             ledger_id=existing.id, balance_after=existing.balance_after, idempotent_replay=True
@@ -97,7 +113,7 @@ def _apply(db: Session, user_id: str, req: MoveMoneyRequest, direction: str) -> 
     except IntegrityError:
         # Hai request cùng reference chạy song song: bản ghi kia đã thắng.
         db.rollback()
-        existing = _find_by_reference(db, req.reference)
+        existing = _replay_of(db, account, req, direction)
         if existing:
             return MoveMoneyResponse(
                 ledger_id=existing.id, balance_after=existing.balance_after, idempotent_replay=True
@@ -158,6 +174,25 @@ def read_account(user_id: str, db: Session = Depends(get_session)) -> AccountRes
     return AccountResponse(
         account_id=account.id, user_id=account.user_id, balance=account.balance, currency=account.currency
     )
+
+
+@app.get(
+    "/internal/accounts/{user_id}/entries/{reference}",
+    response_model=TransactionItem,
+    tags=["internal"],
+    dependencies=[InternalOnly],
+    summary="Tra bút toán theo reference — dùng cho đối soát giao dịch treo",
+    responses={404: {"description": "Chưa có bút toán nào với reference này"}},
+)
+def read_entry(user_id: str, reference: str, db: Session = Depends(get_session)) -> TransactionItem:
+    entry = db.scalar(
+        select(LedgerEntry)
+        .join(Account, LedgerEntry.account_id == Account.id)
+        .where(Account.user_id == user_id, LedgerEntry.reference == reference)
+    )
+    if not entry:
+        raise APIError(404, "ENTRY_NOT_FOUND", "Không tìm thấy bút toán với reference này.")
+    return TransactionItem(**entry.as_dict())
 
 
 @app.post(

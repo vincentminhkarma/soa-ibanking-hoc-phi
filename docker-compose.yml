@@ -8,6 +8,7 @@ x-common-env: &common-env
   OTP_TTL_SECONDS: ${OTP_TTL_SECONDS:-300}
   OTP_MAX_ATTEMPTS: ${OTP_MAX_ATTEMPTS:-5}
   LOCK_HOLD_MS: ${LOCK_HOLD_MS:-150}
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://jaeger:4318}
   AUTH_SERVICE_URL: http://auth-service:8000
   ACCOUNT_SERVICE_URL: http://account-service:8000
   TUITION_SERVICE_URL: http://tuition-service:8000
@@ -53,6 +54,14 @@ services:
     ports: ["1025:1025", "8025:8025"]
     networks: [ibanking]
     restart: unless-stopped
+
+  jaeger:
+    image: jaegertracing/jaeger:2.20.0
+    container_name: ibanking-jaeger
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:16686:16686"
+    networks: [ibanking]
 
   auth-service:
     <<: *service
@@ -117,6 +126,8 @@ services:
     environment:
       <<: *common-env
       SERVICE_NAME: payment-service
+      RECONCILE_INTERVAL_SECONDS: ${RECONCILE_INTERVAL_SECONDS:-30}
+      RECONCILE_STUCK_AFTER_SECONDS: ${RECONCILE_STUCK_AFTER_SECONDS:-60}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-ibanking}:${POSTGRES_PASSWORD:-ibanking}@postgres:5432/paymentdb
     ports: ["8004:8000"]
     depends_on:

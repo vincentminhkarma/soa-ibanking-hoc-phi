@@ -1,0 +1,1 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="1" time="10.461" timestamp="2026-09-14T21:44:33.658760+07:00" hostname="MacBook-Pro-cua-Thanh.local"><testcase classname="tests.test_02_otp" name="test_otp_het_han_bi_tu_choi" time="10.446" /></testsuite></testsuites>

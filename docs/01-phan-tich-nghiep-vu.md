@@ -95,6 +95,7 @@ flowchart LR
 | A5 | Số dư không đủ tại bước 4 (do giao dịch song song) | Giao dịch `FAILED`, **không** chạm vào học phí |
 | A6 | Học phí vừa được người khác thanh toán ở bước 5 | **Hoàn tiền** đã trừ ở bước 4, giao dịch `FAILED` |
 | A7 | Gửi email biên lai lỗi | Giao dịch vẫn `SUCCESS`, ghi log lỗi gửi mail |
+| A8 | Timeout/mất phản hồi khi trừ tiền, gạch nợ hoặc hoàn tiền | Giữ `PROCESSING`, chờ job đối soát đọc ledger/công nợ; không suy đoán thất bại từ lỗi mạng |
 
 ---
 
@@ -105,6 +106,7 @@ stateDiagram-v2
     [*] --> PENDING_OTP: POST /payments<br/>(đã kiểm tra công nợ + số dư)
     PENDING_OTP --> PENDING_OTP: gửi lại OTP
     PENDING_OTP --> PROCESSING: OTP hợp lệ
+    PROCESSING --> PROCESSING: kết quả remote chưa rõ<br/>chờ đối soát
     PROCESSING --> SUCCESS: trừ tiền + gạch nợ thành công
     PROCESSING --> FAILED: thiếu số dư<br/>hoặc học phí đã được thanh toán<br/>(có hoàn tiền bù trừ)
     SUCCESS --> [*]
@@ -190,6 +192,7 @@ erDiagram
         numeric balance_after
         timestamptz otp_expires_at
         timestamptz created_at
+        timestamptz processing_at "lúc vào PROCESSING, dùng cho job đối soát"
         timestamptz completed_at
     }
     PAYMENT_EVENTS {
