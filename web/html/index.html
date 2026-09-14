@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TDTU iBanking — Thanh toán học phí</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🏦</text></svg>">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============================ ĐĂNG NHẬP ============================ -->
+<section id="view-login" class="login-wrap">
+  <form class="card login-card" id="form-login" autocomplete="on">
+    <div class="brand">
+      <div class="brand-mark">TDTU</div>
+      <div>
+        <h1>iBanking</h1>
+        <p class="muted">Phân hệ thanh toán học phí</p>
+      </div>
+    </div>
+
+    <label class="field">
+      <span>Tên đăng nhập</span>
+      <input id="login-username" name="username" required autocomplete="username" placeholder="minhnguyen">
+    </label>
+    <label class="field">
+      <span>Mật khẩu</span>
+      <input id="login-password" name="password" type="password" required autocomplete="current-password" placeholder="••••••">
+    </label>
+
+    <div id="login-error" class="alert alert-error hidden"></div>
+    <button class="btn btn-primary" id="btn-login" type="submit">Đăng nhập</button>
+
+    <p class="hint">Tài khoản demo: <code>minhnguyen</code> / <code>thuha</code> / <code>quocbao</code> / <code>itdu</code> — mật khẩu <code>123456</code></p>
+  </form>
+</section>
+
+<!-- ============================ ỨNG DỤNG ============================ -->
+<div id="view-app" class="hidden">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand small">
+        <div class="brand-mark">TDTU</div>
+        <div><h1>iBanking</h1><p class="muted">Thanh toán học phí</p></div>
+      </div>
+      <div class="topbar-right">
+        <div class="balance-chip">
+          <span class="muted">Số dư khả dụng</span>
+          <strong id="hdr-balance">—</strong>
+        </div>
+        <div class="user-chip">
+          <span id="hdr-name">—</span>
+          <button class="btn btn-ghost" id="btn-logout" type="button">Đăng xuất</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <nav class="tabs">
+      <button class="tab active" data-tab="pay" type="button">Thanh toán học phí</button>
+      <button class="tab" data-tab="history" type="button">Lịch sử giao dịch</button>
+    </nav>
+
+    <!-- ---------------------- TAB THANH TOÁN ---------------------- -->
+    <section id="tab-pay" class="grid">
+      <!-- a. Người nộp tiền -->
+      <article class="card">
+        <h2><span class="step-no">a</span> Người nộp tiền</h2>
+        <p class="muted small">Lấy tự động từ tài khoản đăng nhập, không chỉnh sửa được.</p>
+        <div class="readonly-row"><span>Họ và tên</span><b id="payer-name">—</b></div>
+        <div class="readonly-row"><span>Số điện thoại</span><b id="payer-phone">—</b></div>
+        <div class="readonly-row"><span>Địa chỉ email</span><b id="payer-email">—</b></div>
+      </article>
+
+      <!-- b. Thông tin học phí -->
+      <article class="card">
+        <h2><span class="step-no">b</span> Thông tin học phí</h2>
+        <label class="field">
+          <span>Mã số sinh viên (MSSV)</span>
+          <div class="input-group">
+            <input id="mssv" placeholder="522H0001" maxlength="20" autocomplete="off">
+            <button class="btn btn-secondary" id="btn-lookup" type="button">Tra cứu</button>
+          </div>
+        </label>
+        <div id="lookup-error" class="alert alert-error hidden"></div>
+
+        <div id="fee-box" class="hidden">
+          <div class="readonly-row"><span>Họ và tên sinh viên</span><b id="fee-student">—</b></div>
+          <div class="readonly-row"><span>Ngành / Khoa</span><b id="fee-program">—</b></div>
+          <div class="readonly-row"><span>Học kỳ</span><b id="fee-semester">—</b></div>
+          <div class="readonly-row highlight"><span>Học phí cần thanh toán</span><b id="fee-amount">—</b></div>
+          <div id="fee-status" class="alert alert-warn hidden"></div>
+          <p class="hint">Hệ thống chỉ cho phép thanh toán <b>toàn bộ</b> khoản học phí.</p>
+        </div>
+      </article>
+
+      <!-- c. Thông tin thanh toán -->
+      <article class="card">
+        <h2><span class="step-no">c</span> Thông tin thanh toán</h2>
+        <div class="readonly-row"><span>Số dư khả dụng</span><b id="pay-balance">—</b></div>
+        <div class="readonly-row"><span>Số tiền cần thanh toán</span><b id="pay-amount">—</b></div>
+        <div class="readonly-row"><span>Số dư sau giao dịch (dự kiến)</span><b id="pay-after">—</b></div>
+
+        <label class="checkbox">
+          <input type="checkbox" id="chk-terms">
+          <span>Tôi đã đọc và đồng ý với <a href="#" id="link-terms">thỏa thuận và điều khoản</a> giao dịch của hệ thống.</span>
+        </label>
+
+        <div id="pay-error" class="alert alert-error hidden"></div>
+        <button class="btn btn-primary btn-block" id="btn-confirm" type="button" disabled>Xác nhận giao dịch</button>
+        <p class="hint" id="confirm-hint">Nút chỉ bật khi có khoản học phí chưa thanh toán, đủ số dư và đã đồng ý điều khoản.</p>
+      </article>
+    </section>
+
+    <!-- ---------------------- TAB LỊCH SỬ ---------------------- -->
+    <section id="tab-history" class="hidden">
+      <article class="card">
+        <h2>Giao dịch thanh toán học phí</h2>
+        <div class="table-wrap">
+          <table id="tbl-payments">
+            <thead><tr><th>Thời gian</th><th>MSSV</th><th>Sinh viên</th><th class="right">Số tiền</th><th>Trạng thái</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>Biến động số dư</h2>
+        <div class="table-wrap">
+          <table id="tbl-ledger">
+            <thead><tr><th>Thời gian</th><th>Nội dung</th><th class="right">Số tiền</th><th class="right">Số dư sau</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+  </main>
+</div>
+
+<!-- ============================ MODAL OTP ============================ -->
+<div id="modal-otp" class="modal hidden">
+  <div class="modal-card">
+    <h2>Xác thực giao dịch bằng OTP</h2>
+    <p class="muted">Mã OTP đã được gửi tới email <b id="otp-email">—</b>. Mã có hiệu lực trong <b id="otp-countdown">05:00</b> và chỉ dùng được một lần.</p>
+
+    <div class="otp-summary">
+      <div><span>Sinh viên</span><b id="otp-student">—</b></div>
+      <div><span>Số tiền</span><b id="otp-amount">—</b></div>
+      <div><span>Mã giao dịch</span><b id="otp-payment-id" class="mono">—</b></div>
+    </div>
+
+    <label class="field">
+      <span>Nhập mã OTP (6 chữ số)</span>
+      <input id="otp-code" class="otp-input" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code">
+    </label>
+
+    <div id="otp-error" class="alert alert-error hidden"></div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btn-otp-cancel" type="button">Huỷ</button>
+      <button class="btn btn-secondary" id="btn-otp-resend" type="button">Gửi lại mã</button>
+      <button class="btn btn-primary" id="btn-otp-submit" type="button">Xác nhận</button>
+    </div>
+    <p class="hint">Mở <a href="http://localhost:8025" target="_blank" rel="noopener">MailHog (localhost:8025)</a> để xem email OTP trong môi trường demo.</p>
+  </div>
+</div>
+
+<!-- ============================ MODAL KẾT QUẢ ============================ -->
+<div id="modal-result" class="modal hidden">
+  <div class="modal-card">
+    <div id="result-icon" class="result-icon">✓</div>
+    <h2 id="result-title">Giao dịch thành công</h2>
+    <p id="result-message" class="muted"></p>
+    <div id="result-details" class="otp-summary"></div>
+    <details id="result-trace"><summary>Xem các bước xử lý (saga trace)</summary><div id="trace-body" class="trace"></div></details>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="btn-result-close" type="button">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
