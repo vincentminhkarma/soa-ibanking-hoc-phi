@@ -117,7 +117,7 @@ Kiểm tra trên trình duyệt với khoản học phí riêng `UI538104`: đă
 
 ## 6.4. Phạm vi chứng minh
 
-Mô phỏng crash dùng trạng thái ledger/công nợ/payment thật tại các điểm gián đoạn; không phải thử nghiệm cắt điện máy chủ. Test response-loss gọi thao tác remote thật rồi ném lỗi thay cho phản hồi. Các ca chứng minh cơ chế ở phạm vi kiểm thử, không chứng minh exactly-once dưới mọi phân hoạch mạng hoặc chịu tải production. Unit test chưa đo coverage theo dòng/nhánh; tỷ lệ pass không đồng nghĩa 100% coverage.
+Mô phỏng crash dùng trạng thái ledger/công nợ/payment thật tại các điểm gián đoạn; không phải thử nghiệm cắt điện máy chủ. Đường nâng cấp schema được chạy thật trên `paymentdb`: hạ cột `processing_at`, tái hiện lỗi `UndefinedColumn` trong khi `/health` vẫn `UP`, khởi động lại service để migration vá cột/index/backfill rồi để job đối soát hoàn tiền giao dịch treo (chi tiết ở mục 4.7). Test response-loss gọi thao tác remote thật rồi ném lỗi thay cho phản hồi. Các ca chứng minh cơ chế ở phạm vi kiểm thử, không chứng minh exactly-once dưới mọi phân hoạch mạng hoặc chịu tải production. Unit test chưa đo coverage theo dòng/nhánh; tỷ lệ pass không đồng nghĩa 100% coverage.
 
 # KẾT LUẬN VÀ HƯỚNG PHÁT TRIỂN
 
