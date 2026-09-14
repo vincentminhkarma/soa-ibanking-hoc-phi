@@ -86,7 +86,7 @@ Ngày kiểm chứng: 14/09/2026. Backend chạy Python 3.11 trong Docker Compos
 
 Lệnh chạy: `python3.11 -m pytest -q --junitxml=docs/report-assets/test-results.xml` trong môi trường đã cài `tests/requirements.txt`.
 
-**Kết quả toàn bộ: 88 passed, 1 skipped trong 53,25 giây.** Một cảnh báo deprecation của Starlette/AnyIO, không phải lỗi nghiệp vụ. File JUnit `report-assets/test-results.xml` lưu kết quả từng test. Test skipped kiểm tra OTP hết hạn, tách riêng để không phải đợi 300 giây trong mỗi lần chạy. Lượt riêng với `OTP_TTL_SECONDS=8` đạt **1 passed trong 10,46 giây** (`report-assets/test-otp-expiry.xml`); sau đó đã khôi phục và kiểm tra TTL **300 giây** trong container. Như vậy tất cả 89 ca đã được thực thi thành công qua hai cấu hình, không phải 89 ca pass trong một lượt chạy.
+**Kết quả toàn bộ: 88 passed, 1 skipped trong 53,25 giây.** Một cảnh báo deprecation của Starlette/AnyIO, không phải lỗi nghiệp vụ. File JUnit `report-assets/test-results.xml` lưu kết quả từng test. Test skipped kiểm tra OTP hết hạn, tách riêng để không phải đợi 300 giây trong mỗi lần chạy. Lượt riêng với `OTP_TTL_SECONDS=8` đạt **1 passed trong 10,46 giây** (`report-assets/test-otp-expiry.xml`); sau đó đã khôi phục và kiểm tra TTL **300 giây** trong container. Như vậy tất cả 89 ca đã được thực thi thành công qua hai cấu hình, không phải 89 ca pass trong một lượt chạy. Lượt chạy lại ngày 15/09/2026 trên virtualenv dựng mới hoàn toàn từ `tests/requirements.txt` cho cùng kết quả **88 passed, 1 skipped**, xác nhận bộ kiểm thử tái lập được từ file phụ thuộc chứ không dựa vào môi trường đã cài sẵn.
 
 | Nhóm | Số ca | Kiểm chứng |
 |---|---:|---|
