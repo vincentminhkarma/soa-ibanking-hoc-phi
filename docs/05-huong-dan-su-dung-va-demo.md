@@ -65,7 +65,7 @@ Tab **Lịch sử giao dịch** gồm hai bảng: danh sách giao dịch học p
 curl -s http://localhost:8080/health/services | python3 -m json.tool
 docker compose ps
 ```
-Chỉ ra 6 microservice + gateway + database riêng + MailHog đang chạy, và sơ đồ kiến trúc ở [02-kien-truc-microservices.md](02-kien-truc-microservices.md).
+Chỉ ra 11 container đang chạy: 6 microservice, gateway, PostgreSQL (6 database), MailHog, web và Jaeger; đối chiếu sơ đồ ở [02-kien-truc-microservices.md](02-kien-truc-microservices.md).
 
 ### Màn 2 — Luồng thành công (2 phút)
 Đăng nhập `minhnguyen` → tra cứu `522H0001` → xác nhận → lấy OTP trong MailHog → hoàn tất.
@@ -97,7 +97,20 @@ Sau đó mở giao diện, xem **saga trace** của giao dịch thất bại đ�
 pytest -v
 ```
 
-### Màn 7 — Tài liệu API (1 phút)
+### Màn 7 — Unit test và test pyramid
+```bash
+pytest tests/unit -v
+pytest -m unit -v
+```
+Unit test kiểm tra logic thuần (OTP, JWT, email, quyết định đối soát) và tracing in-memory, không cần Docker. Integration test kiểm tra HTTP/PostgreSQL và lỗi giữa saga; E2E đi từ tạo payment qua OTP/email đến số dư/công nợ/biên lai. Concurrency test thuộc tầng integration, không phải một tầng riêng của pyramid. Mục tiêu là nhiều phản hồi nhanh ở tầng unit, giữ test xuyên dịch vụ cho những tính chất không thể chứng minh bằng mock.
+
+### Màn 8 — Jaeger và phục hồi giao dịch treo
+1. Mở <http://localhost:16686>, chọn service `api-gateway`, thực hiện một luồng thanh toán mới và tìm trace theo thời gian.
+2. Mở waterfall: gateway → payment → account/tuition/otp/notification, kiểm tra cùng trace ID và quan hệ parent-child.
+3. Chạy `pytest tests/test_04_reconciliation.py tests/test_06_saga_recovery.py -v` để kiểm tra trạng thái sau crash và mất phản hồi sau commit; test nền chờ job tự xử lý thay vì chỉ gọi API thủ công. `pytest tests/test_05_tracing.py -v` kiểm tra tự động trace xuyên service.
+4. Đối chiếu balance, ledger, trạng thái fee/payment và span `payment.reconcile`.
+
+### Màn 9 — Tài liệu API (1 phút)
 Mở <http://localhost:8004/docs> (payment-service) — Swagger sinh tự động, có request/response model, mã lỗi và mô tả từng endpoint.
 
 ---
@@ -108,13 +121,13 @@ Mở <http://localhost:8004/docs> (payment-service) — Swagger sinh tự độn
 Mỗi service có database riêng nên không thể dùng một transaction ACID xuyên service. Hệ thống dùng saga có bù trừ: mỗi bước là một transaction cục bộ ACID, nếu bước sau hỏng thì hoàn tác bước trước bằng nghiệp vụ nghịch đảo (hoàn tiền). Xem [04-transaction-concurrency.md](04-transaction-concurrency.md).
 
 **Hỏi: Nếu hệ thống sập ngay sau khi trừ tiền thì sao?**
-Giao dịch nằm lại ở trạng thái `PROCESSING` với bút toán `DEBIT` đã ghi. Vì mọi bước idempotent theo `payment_id`, một job đối soát có thể chạy tiếp hoặc bù trừ an toàn. Bảng `payment_events` chỉ rõ giao dịch dừng ở bước nào. (Job đối soát tự động là phần mở rộng ngoài phạm vi đồ án.)
+Job đối soát **đã được hiện thực** trong payment-service: mặc định chạy mỗi 30 giây, xét `PROCESSING` cũ hơn 60 giây. Job đọc công nợ và cả bút toán debit/refund: hoàn tất nếu đã gạch nợ và chưa hoàn tiền; hoàn tiền nếu chỉ mới debit; huỷ gạch nợ nếu không còn khoản tiền tương ứng. Mỗi payment được khóa riêng để không tranh chấp với foreground/worker khác. Nếu dependency chưa phục hồi, job giữ trạng thái để thử lại. Xem mục 4.7 về giới hạn RPC đang bay và biên lai best-effort.
 
 **Hỏi: OTP có an toàn không?**
 Mã không lưu dạng plaintext (SHA-256 kèm pepper), gắn cứng với `payment_id`, có partial unique index đảm bảo không trùng mã giữa các giao dịch còn hiệu lực, hết hạn sau 5 phút, chỉ dùng được một lần, và bị khoá sau 5 lần nhập sai.
 
 **Hỏi: Tại sao trừ tiền trước rồi mới gạch nợ?**
-Tiền có thể hoàn lại an toàn, còn trạng thái học phí không nên nhấp nháy PAID → UNPAID. Thứ tự này khiến mọi kịch bản lỗi đều kết thúc ở trạng thái an toàn cho người dùng.
+Debit là thao tác có thể bù trừ bằng credit cùng reference; đặt nó trước giúp tránh gạch nợ khi tài khoản không đủ tiền. Nếu kết quả remote chưa rõ thì giữ `PROCESSING` và đối soát, không khẳng định mọi lỗi đều được xử lý tức thời; xem giới hạn ở mục 4.7.
 
 **Hỏi: Đây có thực sự là microservices không, hay chỉ là monolith chia thư mục?**
 Mỗi service là một container riêng, một database riêng, một tiến trình riêng, chỉ giao tiếp qua REST; có thể tắt một service và thấy đúng service phụ thuộc trả `503 SERVICE_UNAVAILABLE`:

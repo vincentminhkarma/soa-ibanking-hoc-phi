@@ -10,6 +10,7 @@ import random
 import re
 import time
 from decimal import Decimal
+from pathlib import Path
 
 import httpx
 import pytest
@@ -24,9 +25,18 @@ PASSWORD = "123456"
 INTERNAL_HEADERS = {"X-Internal-Token": INTERNAL_TOKEN}
 
 
+def pytest_collection_modifyitems(items):
+    unit_dir = Path(__file__).parent / "unit"
+    for item in items:
+        if item.path.is_relative_to(unit_dir):
+            item.add_marker(pytest.mark.unit)
+
+
 @pytest.fixture(scope="session", autouse=True)
-def wait_for_stack():
-    """Chờ toàn bộ service UP trước khi chạy test."""
+def wait_for_stack(request):
+    """Chờ toàn bộ service UP trước khi chạy integration test."""
+    if all(item.get_closest_marker("unit") for item in request.session.items):
+        return
     deadline = time.time() + 120
     while time.time() < deadline:
         try:

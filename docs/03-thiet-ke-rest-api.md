@@ -25,7 +25,7 @@ Tài liệu tương tác (OpenAPI/Swagger) được sinh tự động cho từng
 | Định dạng | JSON, `Content-Type: application/json`, UTF-8 |
 | Xác thực | `Authorization: Bearer <JWT>` cho mọi API trừ `POST /auth/login` |
 | Idempotency | Header `Idempotency-Key` (UUID) ở `POST /payments` |
-| Truy vết | Header `X-Request-Id` (tự sinh nếu client không gửi), có trong mọi response |
+| Truy vết | `X-Request-Id` trong response; OpenTelemetry truyền W3C `traceparent` giữa các service, JSON log có `trace_id`/`span_id` |
 | Tài nguyên | Danh từ số nhiều: `/accounts`, `/tuitions`, `/payments` |
 | Phân trang | `?limit=n` (mặc định 20–50, trần 100–200) |
 | Nội bộ | `/internal/*` — chỉ service gọi nhau, yêu cầu `X-Internal-Token`, gateway chặn |
@@ -232,6 +232,9 @@ Response `200 OK` — giao dịch hoàn tất
 | 409 | `TUITION_ALREADY_PAID` | Học phí vừa được người khác thanh toán — **đã tự động hoàn tiền** |
 | 409 | `PAYMENT_IN_PROGRESS` | Giao dịch đang xử lý |
 | 422 | `VALIDATION_ERROR` | `otp_code` không phải 6 chữ số |
+| 503 | `SERVICE_UNAVAILABLE` | Mất kết nối/phản hồi; giao dịch có thể vẫn `PROCESSING` để đối soát |
+
+Lỗi kỹ thuật hoặc mã lỗi upstream chưa xác định không được hiểu là "chưa trừ tiền". Client cần đọc `GET /payments/{id}` hoặc lịch sử để lấy kết quả cuối, không tạo payment mới chỉ vì timeout. Nếu thao tác hoàn tiền cũng lỗi, payment giữ `PROCESSING` thay vì giả báo đã hoàn.
 
 Gọi lại `confirm` cho giao dịch đã `SUCCESS` trả về `200` với chính giao dịch đó (idempotent), không trừ tiền lần hai.
 
@@ -267,6 +270,8 @@ Yêu cầu header `X-Internal-Token`. **Không** truy cập được qua gateway
 | Service | Method | URI | Mục đích |
 |---|---|---|---|
 | account | `GET` | `/internal/accounts/{user_id}` | Đọc số dư |
+| account | `GET` | `/internal/accounts/{user_id}/entries/{reference}` | Đọc bút toán đúng tài khoản; 404 nếu không có hoặc thuộc tài khoản khác |
+| payment | `POST` | `/internal/payments/reconcile?stuck_after_seconds=60` | Đối soát một lượt; ngưỡng ≥ 0, mặc định lấy cấu hình; trả `scanned` và `resolved` |
 | account | `POST` | `/internal/accounts/{user_id}/debit` | Trừ tiền (idempotent theo `reference`) |
 | account | `POST` | `/internal/accounts/{user_id}/credit` | Hoàn tiền — bù trừ saga |
 | tuition | `GET` | `/internal/tuitions/students/{student_code}` | Đọc công nợ theo MSSV |
@@ -289,7 +294,7 @@ Yêu cầu header `X-Internal-Token`. **Không** truy cập được qua gateway
 ```json
 { "ledger_id": "9c1f...", "balance_after": "40500000.00", "idempotent_replay": false }
 ```
-`409 INSUFFICIENT_FUNDS` nếu số dư không đủ. Gọi lại cùng `reference` trả `idempotent_replay: true` và **không** trừ tiền thêm.
+`409 INSUFFICIENT_FUNDS` nếu số dư không đủ. Gọi lại cùng `reference` trả `idempotent_replay: true` và **không** trừ tiền thêm. Replay chỉ được công nhận khi trùng cả tài khoản, chiều và số tiền; `reference` đã thuộc về bút toán khác trả `409 REFERENCE_CONFLICT` (áp dụng cho cả `debit` lẫn `credit`).
 
 ---
 

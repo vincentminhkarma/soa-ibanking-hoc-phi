@@ -18,7 +18,7 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Query
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
@@ -29,13 +29,14 @@ from common.config import (
     OTP_SERVICE_URL,
     TUITION_SERVICE_URL,
 )
-from common.db import get_session
+from common.db import engine, get_session
 from common.errors import APIError
 from common.http import call_service
-from common.observability import get_request_id
-from common.security import CurrentUser, current_user
+from common.security import CurrentUser, InternalOnly, current_user
 
+from .migrations import migrate
 from .models import FAILED, PENDING_OTP, PROCESSING, SUCCESS, Payment, PaymentEvent
+from .reconciliation import ReconcileReport, reconcile_once, start_background_reconciler
 from .schemas import (
     ConfirmPaymentRequest,
     CreatePaymentRequest,
@@ -44,37 +45,26 @@ from .schemas import (
     PaymentListResponse,
     PaymentResponse,
 )
+from .state import mark_failed, mark_success, record_event
 
 log = logging.getLogger(__name__)
+
+def _on_start() -> None:
+    migrate(engine)  # vá schema cũ trước, job đối soát cần cột processing_at
+    start_background_reconciler()
+
 
 app = create_app(
     "Payment Service",
     "Điều phối luồng thanh toán học phí: kiểm tra công nợ, OTP, trừ tiền, gạch nợ, biên lai.",
+    on_start=_on_start,
 )
 
 
 # --------------------------------------------------------------------------- helpers
-def _event(db: Session, payment_id: str, step: str, status: str, detail: str | None = None) -> None:
-    db.add(
-        PaymentEvent(
-            id=str(uuid.uuid4()),
-            payment_id=payment_id,
-            step=step,
-            status=status,
-            detail=detail,
-            request_id=get_request_id(),
-        )
-    )
-    db.commit()
-
-
-def _fail(db: Session, payment: Payment, code: str, reason: str) -> None:
-    payment.status = FAILED
-    payment.failure_code = code
-    payment.failure_reason = reason[:255]
-    payment.completed_at = datetime.now(UTC)
-    db.commit()
-    log.warning("giao dịch thất bại payment=%s code=%s", payment.id, code)
+# Giữ tên ngắn cho luồng chính; hiện thực nằm ở state.py để job đối soát dùng chung.
+_event = record_event
+_fail = mark_failed
 
 
 def _response(payment: Payment) -> PaymentResponse:
@@ -110,8 +100,8 @@ def _issue_otp(db: Session, payment: Payment) -> dict:
         },
     )
     payment.otp_expires_at = datetime.fromisoformat(otp["expires_at"])
-    db.commit()
     _event(db, payment.id, "OTP_ISSUED", "OK", f"hết hạn {otp['expires_at']}")
+    db.commit()
     return otp
 
 
@@ -182,8 +172,9 @@ def create_payment(
         idempotency_key=idempotency_key,
     )
     db.add(payment)
-    db.commit()
+    db.flush()
     _event(db, payment.id, "PAYMENT_CREATED", "OK", f"fee={fee['id']} amount={amount}")
+    db.commit()
 
     otp = _issue_otp(db, payment)
     return CreatePaymentResponse(
@@ -249,9 +240,14 @@ def confirm_payment(
     if payment.status != PENDING_OTP:
         raise APIError(409, "PAYMENT_IN_PROGRESS", "Giao dịch đang được xử lý hoặc đã kết thúc.")
     payment.status = PROCESSING
+    payment.processing_at = datetime.now(UTC)
     db.commit()
 
-    # Bước 3 — trừ tiền (idempotent theo reference = payment_id).
+    # ponytail: giữ một connection qua HTTP để khóa saga; dùng lease/fencing nếu cần tải lớn.
+    payment = _owned(db, payment_id, user, lock=True)
+    if payment.status != PROCESSING:
+        raise APIError(409, "PAYMENT_IN_PROGRESS", "Giao dịch đã được đối soát, hãy tra cứu kết quả.")
+
     try:
         debit = call_service(
             "POST",
@@ -263,12 +259,14 @@ def confirm_payment(
             },
         )
     except APIError as exc:
-        _event(db, payment.id, "DEBIT", "FAILED", exc.message)
-        _fail(db, payment, exc.code, exc.message)
+        rejected = exc.code in {"INSUFFICIENT_FUNDS", "ACCOUNT_NOT_FOUND"}
+        _event(db, payment.id, "DEBIT", "FAILED" if rejected else "UNKNOWN", exc.message)
+        if rejected:
+            _fail(db, payment, exc.code, exc.message)
+        db.commit()
         raise
     _event(db, payment.id, "DEBIT", "OK", f"số dư còn {debit['balance_after']}")
 
-    # Bước 4 — gạch nợ học phí. Thất bại ở đây phải hoàn tiền cho người nộp.
     try:
         call_service(
             "POST",
@@ -276,27 +274,34 @@ def confirm_payment(
             json={"payment_ref": payment.id},
         )
     except APIError as exc:
-        _event(db, payment.id, "MARK_TUITION_PAID", "FAILED", exc.message)
-        call_service(
-            "POST",
-            f"{ACCOUNT_SERVICE_URL}/internal/accounts/{payment.payer_user_id}/credit",
-            json={
-                "amount": str(payment.amount),
-                "reference": f"{payment.id}:refund",
-                "description": f"Hoàn tiền giao dịch {payment.id} - {exc.message}",
-            },
-        )
+        rejected = exc.code in {"TUITION_ALREADY_PAID", "FEE_NOT_FOUND"}
+        _event(db, payment.id, "MARK_TUITION_PAID", "FAILED" if rejected else "UNKNOWN", exc.message)
+        if not rejected:
+            db.commit()
+            raise
+        try:
+            call_service(
+                "POST",
+                f"{ACCOUNT_SERVICE_URL}/internal/accounts/{payment.payer_user_id}/credit",
+                json={
+                    "amount": str(payment.amount),
+                    "reference": f"{payment.id}:refund",
+                    "description": f"Hoàn tiền giao dịch {payment.id}",
+                },
+            )
+        except APIError as refund_error:
+            _event(db, payment.id, "REFUND", "UNKNOWN", refund_error.message)
+            db.commit()
+            raise
         _event(db, payment.id, "REFUND", "COMPENSATED", "đã hoàn tiền do gạch nợ thất bại")
         _fail(db, payment, exc.code, exc.message)
+        db.commit()
         raise
     _event(db, payment.id, "MARK_TUITION_PAID", "OK")
 
-    # Bước 5 — kết thúc giao dịch.
-    payment.status = SUCCESS
-    payment.balance_after = Decimal(str(debit["balance_after"]))
-    payment.completed_at = datetime.now(UTC)
-    db.commit()
+    mark_success(db, payment, Decimal(str(debit["balance_after"])))
     _event(db, payment.id, "PAYMENT_COMPLETED", "OK")
+    db.commit()
 
     # Bước 6 — biên lai. Email hỏng không được phép làm hỏng giao dịch đã thành công.
     try:
@@ -322,8 +327,22 @@ def confirm_payment(
     except APIError as exc:
         log.error("không gửi được biên lai payment=%s err=%s", payment.id, exc.message)
         _event(db, payment.id, "RECEIPT_EMAIL", "FAILED", exc.message)
+    db.commit()
 
     return _response(payment)
+
+
+@app.post(
+    "/internal/payments/reconcile",
+    tags=["internal"],
+    dependencies=[InternalOnly],
+    summary="Chạy một lượt đối soát giao dịch treo (vận hành / demo)",
+)
+def reconcile(
+    stuck_after_seconds: int | None = Query(default=None, ge=0), db: Session = Depends(get_session),
+) -> dict:
+    report: ReconcileReport = reconcile_once(db, stuck_after_seconds)
+    return {"scanned": report.scanned, "resolved": report.resolved}
 
 
 @app.get("/api/v1/payments/{payment_id}", response_model=PaymentResponse, tags=["public"], summary="Chi tiết giao dịch")
@@ -351,6 +370,7 @@ def get_events(
             step=r.step,
             status=r.status,
             detail=r.detail,
+            request_id=r.request_id,
             created_at=r.created_at.isoformat() if r.created_at else None,
         )
         for r in rows

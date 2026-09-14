@@ -1,2 +1,15 @@
 pytest==8.3.4
 httpx==0.28.1
+# Unit test import trực tiếp services/common/security.py
+fastapi==0.115.6
+pyjwt==2.10.1
+# Dựng lại trạng thái giao dịch treo cho test đối soát.
+# Không ghim cứng: bản binary phải có wheel khớp phiên bản Python của máy chấm.
+psycopg[binary]>=3.2.10
+opentelemetry-api==1.30.0
+opentelemetry-sdk==1.30.0
+opentelemetry-instrumentation-fastapi==0.51b0
+opentelemetry-instrumentation-httpx==0.51b0
+opentelemetry-exporter-otlp-proto-http==1.30.0
+sqlalchemy>=2.0.36,<2.1
+email-validator==2.2.0

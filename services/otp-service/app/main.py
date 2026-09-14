@@ -3,10 +3,7 @@
 Quy tắc theo đề bài: OTP gắn với một giao dịch, không trùng OTP đang hiệu lực
 của giao dịch khác, hạn 5 phút, chỉ dùng thành công một lần.
 """
-import hashlib
 import logging
-import os
-import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -23,13 +20,10 @@ from common.errors import APIError
 from common.http import call_service
 from common.security import InternalOnly
 
+from .codes import generate_code, hash_code, mask_email
 from .models import ACTIVE, EXPIRED, REVOKED, USED, OtpCode
 
 log = logging.getLogger(__name__)
-
-# Pepper: băm mã theo chính mã (không trộn payment_id) để index unique trên
-# code_hash thực sự chặn được trùng mã giữa các giao dịch đang hiệu lực.
-OTP_PEPPER = os.getenv("OTP_PEPPER", "tdtu-ibanking-pepper")
 
 app = create_app("OTP Service", "Sinh, gửi qua email và xác thực mã OTP dùng một lần.")
 
@@ -59,16 +53,6 @@ class VerifyOtpResponse(BaseModel):
     verified: bool
 
 
-def _hash(code: str) -> str:
-    return hashlib.sha256((OTP_PEPPER + code).encode()).hexdigest()
-
-
-def _mask(email: str) -> str:
-    name, _, domain = email.partition("@")
-    keep = name[:2] if len(name) > 2 else name[:1]
-    return f"{keep}{'*' * max(len(name) - len(keep), 3)}@{domain}"
-
-
 def _now() -> datetime:
     return datetime.now(UTC)
 
@@ -92,11 +76,11 @@ def issue(req: IssueOtpRequest, db: Session = Depends(get_session)) -> IssueOtpR
 
     expires_at = _now() + timedelta(seconds=OTP_TTL_SECONDS)
     for _ in range(10):  # thử lại nếu mã đụng OTP đang hiệu lực của giao dịch khác
-        code = f"{secrets.randbelow(1_000_000):06d}"
+        code = generate_code()
         row = OtpCode(
             id=str(uuid.uuid4()),
             payment_id=req.payment_id,
-            code_hash=_hash(code),
+            code_hash=hash_code(code),
             status=ACTIVE,
             expires_at=expires_at,
         )
@@ -137,7 +121,7 @@ def issue(req: IssueOtpRequest, db: Session = Depends(get_session)) -> IssueOtpR
         otp_id=row.id,
         expires_at=expires_at,
         ttl_seconds=OTP_TTL_SECONDS,
-        email_masked=_mask(req.email),
+        email_masked=mask_email(req.email),
     )
 
 
@@ -165,7 +149,7 @@ def verify(req: VerifyOtpRequest, db: Session = Depends(get_session)) -> VerifyO
         raise APIError(400, "OTP_EXPIRED", "Mã OTP đã hết hạn. Vui lòng yêu cầu mã mới.")
 
     row.attempts += 1
-    if row.code_hash != _hash(req.code):
+    if row.code_hash != hash_code(req.code):
         remaining = OTP_MAX_ATTEMPTS - row.attempts
         if remaining <= 0:
             row.status = REVOKED
