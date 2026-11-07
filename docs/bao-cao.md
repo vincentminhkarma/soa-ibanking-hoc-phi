@@ -23,16 +23,18 @@
         <td class="meta-val">Dương Hữu Phúc</td>
       </tr>
       <tr>
-        <td class="meta-label">Sinh viên thực hiện:</td>
-        <td class="meta-val">Nguyễn Hoàng Thanh Minh</td>
+        <td class="meta-label" rowspan="3">Thành viên nhóm:</td>
+        <td class="meta-val">523H0020 — Lê Nam Giang</td>
       </tr>
       <tr>
-        <td class="meta-label">Mã số sinh viên:</td>
-        <td class="meta-val">519H0194</td>
+        <td class="meta-val">523H0149 — Nguyễn Gia Nhật Khánh</td>
+      </tr>
+      <tr>
+        <td class="meta-val">519H0194 — Nguyễn Hoàng Thanh Minh</td>
       </tr>
       <tr>
         <td class="meta-label">Mã nhóm:</td>
-        <td class="meta-val"></td>
+        <td class="meta-val">11</td>
       </tr>
       <tr>
         <td class="meta-label">Học kỳ:</td>

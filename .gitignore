@@ -6,3 +6,6 @@ __pycache__/
 .pytest_cache/
 .venv-report/
 .report-tools/
+docs/video/*.mp4
+*.zip
+node_modules/

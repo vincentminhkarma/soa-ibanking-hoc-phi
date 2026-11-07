@@ -19,7 +19,7 @@ from playwright.sync_api import sync_playwright
 DOCS = Path(__file__).resolve().parent
 ASSETS = DOCS / "report-assets"
 MERMAID = DOCS.parent / ".report-tools/node_modules/mermaid/dist/mermaid.min.js"
-OUTPUT = DOCS / "BaoCao_519H0194"
+OUTPUT = DOCS / "BaoCao"
 BREAK = '<div class="page-break"></div>'
 
 
@@ -151,8 +151,10 @@ def build_docx(body, headings):
     paragraph("BÁO CÁO ĐỒ ÁN GIỮA KỲ", 20, True, 20)
     paragraph("504070 — Service-Oriented Architecture\n(Kiến trúc hướng dịch vụ)", 14, True, 22)
     paragraph("PHÂN HỆ ĐÓNG HỌC PHÍ TRÊN ỨNG DỤNG IBANKING\nTHEO KIẾN TRÚC MICROSERVICES", 14, True, 55)
-    for text in ("Giảng viên hướng dẫn: Dương Hữu Phúc", "Sinh viên: Nguyễn Hoàng Thanh Minh",
-                 "MSSV: 519H0194", "Mã nhóm: ____________________", "Học kỳ: HK1 / 2026–2027"):
+    for text in ("Giảng viên hướng dẫn: Dương Hữu Phúc", "Thành viên nhóm:",
+                 "523H0020 — Lê Nam Giang", "523H0149 — Nguyễn Gia Nhật Khánh",
+                 "519H0194 — Nguyễn Hoàng Thanh Minh",
+                 "Mã nhóm: 11", "Học kỳ: HK1 / 2026–2027"):
         paragraph(text, centered=False)
     paragraph("TP. HỒ CHÍ MINH, 2026", 12, True, 0)
     paragraph("MỤC LỤC", 16, True)

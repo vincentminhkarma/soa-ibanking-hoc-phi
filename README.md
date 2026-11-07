@@ -22,7 +22,7 @@
 | [docs/03-thiet-ke-rest-api.md](docs/03-thiet-ke-rest-api.md) | Thiết kế REST API: URI, method, request/response, status code, error code |
 | [docs/04-transaction-concurrency.md](docs/04-transaction-concurrency.md) | Cơ chế transaction, saga bù trừ, khoá dòng, hai tình huống đồng thời |
 | [docs/05-huong-dan-su-dung-va-demo.md](docs/05-huong-dan-su-dung-va-demo.md) | Hướng dẫn sử dụng, dữ liệu mẫu, kịch bản demo, Q&A bảo vệ |
-| [Báo cáo Word](docs/BaoCao_519H0194.docx) · [Báo cáo PDF](docs/BaoCao_519H0194.pdf) | Nguyễn Hoàng Thanh Minh — 519H0194; GVHD Dương Hữu Phúc |
+| [Báo cáo Word](docs/BaoCao.docx) · [Báo cáo PDF](docs/BaoCao.pdf) | Lê Nam Giang — 523H0020; Nguyễn Gia Nhật Khánh — 523H0149; Nguyễn Hoàng Thanh Minh — 519H0194; GVHD Dương Hữu Phúc |
 
 ---
 
@@ -55,6 +55,16 @@ flowchart LR
 ---
 
 ## 3. Hướng dẫn cài đặt
+
+### ⚡ Cài đặt nhanh — một lệnh
+
+```bash
+git clone https://github.com/vincentminhkarma/soa-ibanking-hoc-phi.git
+cd soa-ibanking-hoc-phi
+./setup.sh
+```
+
+`setup.sh` tự làm hết: kiểm tra Docker (macOS tự mở Docker Desktop nếu đang tắt), tạo `.env` từ `.env.example`, build 7 image và chạy 11 container chờ đến khi healthy, cài thư viện kiểm thử vào `.venv` nếu máy có Python ≥ 3.11, rồi in địa chỉ truy cập. Windows: chạy trong Git Bash hoặc WSL. Các mục 3.1–4 dưới đây là phần làm tay tương đương.
 
 ### 3.1. Yêu cầu môi trường
 
@@ -170,6 +180,7 @@ Pyramid được phân tầng theo phạm vi, không chỉ số lượng: unit c
 | `tests/test_04_reconciliation.py` | Crash recovery, refund, khóa dòng, worker đồng thời, job nền | 15 |
 | `tests/test_05_tracing.py` | Jaeger trace xuyên 6 service, parent-child và dữ liệu nhạy cảm | 1 |
 | `tests/test_06_saga_recovery.py` | Mất phản hồi sau commit, dependency lỗi/phục hồi, foreground exclusion | 5 |
+| `tests/test_07_migration_and_idempotency.py` | Nâng cấp schema và kiểm tra idempotency sổ cái | 5 |
 
 
 > Test `test_otp_het_han_bi_tu_choi` bị skip ở cấu hình mặc định vì phải chờ hết 5 phút. Chạy nó bằng cách rút ngắn TTL:
@@ -181,7 +192,7 @@ Pyramid được phân tầng theo phạm vi, không chỉ số lượng: unit c
 
 ---
 
-Kết quả ngày 14/09/2026: **83 passed, 1 skipped trong 59,78 giây**; riêng ca OTP hết hạn ở TTL 8 giây đạt **1 passed trong 10,46 giây**. Đã khôi phục TTL 300 giây. Hai file JUnit trong `docs/report-assets/` ghi nhận cả hai lượt; không diễn giải thành 84 ca pass trong một lượt hoặc 100% coverage.
+Kết quả ngày 14/09/2026: **88 passed, 1 skipped trong 53,25 giây**; riêng ca OTP hết hạn ở TTL 8 giây đạt **1 passed trong 10,46 giây**. Đã khôi phục TTL 300 giây. Hai file JUnit trong `docs/report-assets/` ghi nhận cả hai lượt; không diễn giải thành 89 ca pass trong một lượt hoặc 100% coverage.
 
 ## 7. Cấu trúc thư mục
 
@@ -268,4 +279,4 @@ npm install --prefix .report-tools mermaid@12.0.0
 ./.venv-report/bin/python3.11 docs/build_report.py
 ```
 
-Script ghép `docs/bao-cao.md` với tài liệu 01–05, render Mermaid **cục bộ**, rồi xuất [Word](docs/BaoCao_519H0194.docx) và [PDF](docs/BaoCao_519H0194.pdf). Ảnh minh chứng và JUnit có sẵn trong `docs/report-assets/`; build báo cáo không chạy lại kiểm thử hay tự chụp lại giao diện. Khi cập nhật kết quả, cần chạy test/chụp minh chứng mới và sửa phần kiểm chứng trong nguồn báo cáo. Mã nhóm trên bìa để trống vì chưa được cung cấp.
+Script ghép `docs/bao-cao.md` với tài liệu 01–05, render Mermaid **cục bộ**, rồi xuất [Word](docs/BaoCao.docx) và [PDF](docs/BaoCao.pdf). Ảnh minh chứng và JUnit có sẵn trong `docs/report-assets/`; build báo cáo không chạy lại kiểm thử hay tự chụp lại giao diện. Khi cập nhật kết quả, cần chạy test/chụp minh chứng mới và sửa phần kiểm chứng trong nguồn báo cáo. Mã nhóm trên bìa: **11**.
