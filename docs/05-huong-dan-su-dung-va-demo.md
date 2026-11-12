@@ -12,6 +12,12 @@
 | `thuha` | Trần Thu Hà | 0912345678 | thuha@tdtu.edu.vn | 20.000.000 ₫ |
 | `quocbao` | Võ Quốc Bảo | 0923456789 | quocbao@tdtu.edu.vn | 15.000.000 ₫ |
 | `itdu` | Lê Ít Dư | 0934567890 | itdu@tdtu.edu.vn | 1.000.000 ₫ |
+| `ngoclan` | Phạm Ngọc Lan | 0945678901 | ngoclan@tdtu.edu.vn | 30.000.000 ₫ |
+| `ducthinh` | Hoàng Đức Thịnh | 0956789012 | ducthinh@tdtu.edu.vn | 25.000.000 ₫ |
+| `hoangyen` | Đỗ Hoàng Yến | 0967890123 | hoangyen@tdtu.edu.vn | 18.000.000 ₫ |
+| `giahan` | Lý Gia Hân | 0978901234 | giahan@tdtu.edu.vn | 40.000.000 ₫ |
+| `tuananh` | Bùi Tuấn Anh | 0989012345 | tuananh@tdtu.edu.vn | 22.000.000 ₫ |
+| `camtu` | Trịnh Cẩm Tú | 0990123456 | camtu@tdtu.edu.vn | 12.000.000 ₫ |
 
 **Sinh viên và học phí** — học kỳ `HK1/2026-2027`
 
@@ -22,6 +28,8 @@
 | `522H0003` | Phạm Minh Tuấn | 10.200.000 ₫ | UNPAID | Dự phòng |
 | `522H0004` | Lê Thị Lan | 7.300.000 ₫ | **PAID** | Học phí đã đóng |
 | `522H0005` | Võ Quốc Bảo | 11.000.000 ₫ | UNPAID | Hai người cùng đóng |
+
+Dữ liệu gốc còn 25 sinh viên khác (`522H0006` – `522L0030`, 7 khoa; 16 UNPAID, 9 PAID) khai báo trong `services/tuition-service/app/seed.py`. `./setup.sh` chạy thêm `scripts/seed_demo.py`: sáu tài khoản phụ thanh toán 9 khoản trong số này qua luồng thật để có sẵn lịch sử giao dịch, còn lại 7 khoản UNPAID.
 
 ---
 

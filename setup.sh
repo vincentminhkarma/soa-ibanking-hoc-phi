@@ -40,7 +40,7 @@ for i in 1 2 3; do
 done
 docker compose ps --format 'table {{.Service}}\t{{.Status}}'
 
-step "4/4 Môi trường kiểm thử Python (tuỳ chọn)"
+step "4/4 Môi trường kiểm thử Python và giao dịch mẫu (tuỳ chọn)"
 PY=""
 for c in python3.11 python3 python; do
   if command -v "$c" >/dev/null && "$c" -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null; then PY=$c; break; fi
@@ -54,6 +54,8 @@ else
   "$VPY" -m pip install -q -r tests/requirements.txt
   echo "Đã cài thư viện kiểm thử vào .venv ($("$VPY" --version))."
   echo "Chạy test: $VPY -m pytest"
+  echo "Tạo lịch sử giao dịch mẫu (bỏ qua nếu đã có)…"
+  "$VPY" scripts/seed_demo.py || echo "Chưa tạo được giao dịch mẫu; chạy lại sau: $VPY scripts/seed_demo.py"
 fi
 
 curl -fsS http://localhost:8080/health/services >/dev/null && HEALTH="UP" || HEALTH="chưa sẵn sàng, xem: docker compose logs"

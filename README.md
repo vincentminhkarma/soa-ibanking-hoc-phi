@@ -141,7 +141,7 @@ docker compose logs -f payment-service
 
 ## 5. Hướng dẫn sử dụng nhanh
 
-**Tài khoản demo** (mật khẩu chung `123456`): `minhnguyen` · `thuha` · `quocbao` · `itdu`
+**Tài khoản demo** (mật khẩu chung `123456`): `minhnguyen` · `thuha` · `quocbao` · `itdu`, cùng 6 tài khoản phụ đã có lịch sử giao dịch mẫu (`ngoclan`, `ducthinh`, `hoangyen`, `giahan`, `tuananh`, `camtu`)
 **MSSV demo:** `522H0001` · `522H0002` · `522H0003` · `522H0004` *(đã đóng)* · `522H0005`
 
 1. Mở <http://localhost:3000>, đăng nhập `minhnguyen` / `123456`.
