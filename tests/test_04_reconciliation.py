@@ -12,7 +12,7 @@ from decimal import Decimal
 import httpx
 import psycopg
 import pytest
-from conftest import ACCOUNT_URL, INTERNAL_HEADERS, TUITION_URL, Client, bob, fee_state, new_fee, top_up
+from conftest import ACCOUNT_URL, INTERNAL_HEADERS, TUITION_URL, Client, fee_state, new_fee, top_up
 
 PAYMENT_URL = os.getenv("PAYMENT_URL", "http://localhost:8004")
 PAYMENT_DSN = os.getenv("PAYMENT_DSN", "postgresql://ibanking:ibanking@localhost:5433/paymentdb")
