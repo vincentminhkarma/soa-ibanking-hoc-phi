@@ -1,0 +1,5 @@
+# Pyrefly (type checker trong IDE) dùng cùng import root với `pythonpath` của pytest.ini,
+# nên `common` (services/) và `_loader` (tests/unit/) được nhận diện như khi chạy pytest.
+search-path = ["tests", "services", "tests/unit"]
+# Giữ mức kiểm tra như khi chưa có file config: chỉ báo lỗi chắc chắn (import, cú pháp, ...).
+preset = "basic"

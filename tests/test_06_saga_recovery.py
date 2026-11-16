@@ -7,12 +7,19 @@ import sys
 import threading
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
 from conftest import ACCOUNT_URL, INTERNAL_HEADERS, TUITION_URL, Client, fee_state, new_fee, read_otp, top_up
 from common.errors import APIError
 from common.security import CurrentUser
+
+# Gán trong fixture payment_runtime (payment-service được nạp động); khai báo để type checker biết tên.
+payment_main: Any
+payment_reconcile: Any
+ConfirmPaymentRequest: Any
+IsolatedSession: Any
 
 
 @pytest.fixture(scope="module", autouse=True)
