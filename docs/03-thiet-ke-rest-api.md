@@ -66,7 +66,7 @@ Tài liệu tương tác (OpenAPI/Swagger) được sinh tự động cho từng
 
 | # | Method | URI | Mô tả | Auth |
 |---|---|---|---|---|
-| A1 | `POST` | `/api/v1/auth/login` | Đăng nhập | ❌ |
+| A1 | `POST` | `/api/v1/auth/login` | Đăng nhập | ✗ |
 | A2 | `GET` | `/api/v1/auth/me` | Thông tin người dùng đang đăng nhập | ✔ |
 
 **A1 · POST /api/v1/auth/login**

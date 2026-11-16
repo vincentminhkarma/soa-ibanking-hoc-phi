@@ -32,7 +32,7 @@ flowchart TB
         DB6[("notificationdb")]
     end
 
-    SMTP["✉️ SMTP / MailHog<br/>:1025 · UI :8025<br/><i>external service</i>"]
+    SMTP["SMTP / MailHog<br/>:1025 · UI :8025<br/><i>external service</i>"]
 
     JAEGER["Jaeger :16686<br/>OpenTelemetry / OTLP HTTP"]
     GW & AUTH & ACC & TUI & PAY & OTP & NOTI -.->|OTLP spans| JAEGER

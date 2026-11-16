@@ -21,8 +21,9 @@
 | [docs/02-kien-truc-microservices.md](docs/02-kien-truc-microservices.md) | **Microservices Architecture Diagram**, trách nhiệm từng service, giao tiếp, sequence diagram, giải thích thiết kế |
 | [docs/03-thiet-ke-rest-api.md](docs/03-thiet-ke-rest-api.md) | Thiết kế REST API: URI, method, request/response, status code, error code |
 | [docs/04-transaction-concurrency.md](docs/04-transaction-concurrency.md) | Cơ chế transaction, saga bù trừ, khoá dòng, hai tình huống đồng thời |
-| [docs/05-huong-dan-su-dung-va-demo.md](docs/05-huong-dan-su-dung-va-demo.md) | Hướng dẫn sử dụng, dữ liệu mẫu, kịch bản demo, Q&A bảo vệ |
+| [docs/05-huong-dan-su-dung-va-demo.md](docs/05-huong-dan-su-dung-va-demo.md) | Hướng dẫn sử dụng, dữ liệu mẫu, kịch bản demo, câu hỏi thường gặp |
 | [Báo cáo Word](docs/BaoCao.docx) · [Báo cáo PDF](docs/BaoCao.pdf) | Lê Nam Giang — 523H0020; Nguyễn Gia Nhật Khánh — 523H0149; Nguyễn Hoàng Thanh Minh — 519H0194; GVHD Dương Hữu Phúc |
+| [Slide trình bày](docs/Slide.pptx) | Slide báo cáo giữa kỳ |
 
 ---
 
@@ -33,7 +34,7 @@ flowchart LR
     W["Web App<br/>:3000"] --> G["API Gateway<br/>:8080"]
     G --> A["auth<br/>:8001"] & B["account<br/>:8002"] & T["tuition<br/>:8003"] & P["payment<br/>:8004"]
     P --> B & T & O["otp<br/>:8005"] & N["notification<br/>:8006"]
-    O --> N --> M["✉️ MailHog<br/>:8025"]
+    O --> N --> M["MailHog<br/>:8025"]
     A --- DB[("PostgreSQL<br/>6 database riêng")]
     B --- DB
     T --- DB
@@ -56,7 +57,7 @@ flowchart LR
 
 ## 3. Hướng dẫn cài đặt
 
-### ⚡ Cài đặt nhanh — một lệnh
+### Cài đặt nhanh — một lệnh
 
 ```bash
 git clone https://github.com/vincentminhkarma/soa-ibanking-hoc-phi.git
@@ -121,11 +122,11 @@ curl -s http://localhost:8080/health/services
 
 | Thành phần | URL |
 |---|---|
-| 🖥️ **Giao diện web** | <http://localhost:3000> |
-| 🚪 API Gateway | <http://localhost:8080> · [Swagger](http://localhost:8080/docs) · [danh sách service](http://localhost:8080/services) |
-| ✉️ **Hộp thư MailHog** (xem email OTP/biên lai) | <http://localhost:8025> |
-| 📘 Swagger từng service | <http://localhost:8001/docs> … <http://localhost:8006/docs> |
-| 🐘 PostgreSQL | `localhost:5433` — user/password mặc định `ibanking` |
+| **Giao diện web** | <http://localhost:3000> |
+| API Gateway | <http://localhost:8080> · [Swagger](http://localhost:8080/docs) · [danh sách service](http://localhost:8080/services) |
+| **Hộp thư MailHog** (xem email OTP/biên lai) | <http://localhost:8025> |
+| Swagger từng service | <http://localhost:8001/docs> … <http://localhost:8006/docs> |
+| PostgreSQL | `localhost:5433` — user/password mặc định `ibanking` |
 | Jaeger | <http://localhost:16686> — xem trace, quan hệ span và thời gian từng lời gọi |
 
 ### Dừng / khởi động lại
@@ -167,9 +168,7 @@ python3.11 -m venv .venv
 ./.venv/bin/python3.11 -m pytest tests/test_04_reconciliation.py -v
 ```
 
-Unit test chạy **không cần Docker**, kiểm tra logic thuần và tracing với exporter in-memory. Integration/E2E gọi hệ thống qua API Gateway và **lấy mã OTP từ MailHog**. Các test concurrency/recovery dùng PostgreSQL thật; không dùng mock để chứng minh khóa dòng. Test lỗi saga chèn lỗi phản hồi ở adapter HTTP sau khi thao tác thật đã commit.
-
-Pyramid được phân tầng theo phạm vi, không chỉ số lượng: unit cho phản hồi nhanh; integration cho tương tác dịch vụ và database; E2E cho toàn bộ payment/OTP/email. Không chạy test song song trên các tài khoản demo dùng chung.
+Unit test chạy **không cần Docker**, kiểm tra logic thuần và tracing với exporter in-memory. Integration/E2E gọi hệ thống qua API Gateway và **lấy mã OTP từ MailHog**. Các test concurrency/recovery chạy trên PostgreSQL thật, không dùng mock; test lỗi saga giả lập mất phản hồi ở tầng HTTP sau khi thao tác phía service kia đã commit. Không chạy các test song song với nhau vì chúng dùng chung tài khoản demo.
 
 | File | Nội dung | Số test |
 |---|---|---|
@@ -182,7 +181,6 @@ Pyramid được phân tầng theo phạm vi, không chỉ số lượng: unit c
 | `tests/test_06_saga_recovery.py` | Mất phản hồi sau commit, dependency lỗi/phục hồi, foreground exclusion | 5 |
 | `tests/test_07_migration_and_idempotency.py` | Nâng cấp schema và kiểm tra idempotency sổ cái | 5 |
 
-
 > Test `test_otp_het_han_bi_tu_choi` bị skip ở cấu hình mặc định vì phải chờ hết 5 phút. Chạy nó bằng cách rút ngắn TTL:
 > ```bash
 > OTP_TTL_SECONDS=8 docker compose up -d --no-deps --wait otp-service
@@ -190,15 +188,16 @@ Pyramid được phân tầng theo phạm vi, không chỉ số lượng: unit c
 > docker compose up -d --no-deps --wait otp-service     # trả lại TTL trong cấu hình, mặc định 300 giây
 > ```
 
----
+Kết quả chạy ngày 14/09/2026: **88 passed, 1 skipped** trong 53,25 giây; ca OTP hết hạn chạy riêng với TTL 8 giây: **1 passed**. File JUnit của hai lượt chạy nằm trong `docs/report-assets/`.
 
-Kết quả ngày 14/09/2026: **88 passed, 1 skipped trong 53,25 giây**; riêng ca OTP hết hạn ở TTL 8 giây đạt **1 passed trong 10,46 giây**. Đã khôi phục TTL 300 giây. Hai file JUnit trong `docs/report-assets/` ghi nhận cả hai lượt; không diễn giải thành 89 ca pass trong một lượt hoặc 100% coverage.
+---
 
 ## 7. Cấu trúc thư mục
 
 ```
 .
 ├── docker-compose.yml            # 11 container: 7 service + postgres + mailhog + web + jaeger
+├── setup.sh                      # cài đặt và khởi chạy bằng một lệnh
 ├── .env.example                  # cấu hình mẫu
 ├── pytest.ini
 ├── db/init/                      # SQL tạo 6 database (database-per-service)
@@ -223,8 +222,9 @@ Kết quả ngày 14/09/2026: **88 passed, 1 skipped trong 53,25 giây**; riêng
 ├── web/
 │   ├── nginx.conf                # phục vụ tĩnh + proxy /api → gateway (cùng origin)
 │   └── html/                     # index.html · styles.css · app.js
-├── tests/                        # integration + E2E + concurrency test
-└── docs/                         # 5 tài liệu phân tích & thiết kế
+├── scripts/seed_demo.py          # tạo lịch sử giao dịch mẫu
+├── tests/                        # unit, integration/E2E, concurrency, recovery test
+└── docs/                         # tài liệu thiết kế 01–05, báo cáo Word/PDF, slide, minh chứng kiểm thử
 ```
 
 ---
@@ -252,7 +252,7 @@ Kết quả ngày 14/09/2026: **88 passed, 1 skipped trong 53,25 giây**; riêng
 
 **Các điểm nâng cao:** API Gateway · idempotency · saga bù trừ + job đối soát PROCESSING · OpenTelemetry/Jaeger + JSON log liên kết trace · OpenAPI · unit/integration/E2E/concurrency/recovery test · Docker Compose có health check.
 
-Jaeger dùng bộ nhớ (mất trace khi restart). Đối soát bảo đảm phục hồi trong phạm vi được kiểm thử, không phải exactly-once với RPC trì hoãn vô hạn; xem giới hạn và khóa saga ở docs/04. Không thêm broker/outbox hay SQL/SMTP spans ngoài phạm vi hiện tại.
+**Hạn chế:** Jaeger lưu trace trong bộ nhớ (mất khi khởi động lại); chưa có message broker/outbox; giới hạn của job đối soát và khoá saga được nêu ở `docs/04` mục 4.7.
 
 ---
 
@@ -266,17 +266,3 @@ Jaeger dùng bộ nhớ (mất trace khi restart). Đối soát bảo đảm ph�
 | Đăng nhập báo lỗi mạng | Gateway chưa lên | `curl http://localhost:8080/health` |
 | Muốn về dữ liệu mẫu ban đầu | Dữ liệu đã bị test/demo thay đổi | `docker compose down -v && docker compose up -d` |
 | Test báo "Hệ thống chưa sẵn sàng" | Stack chưa chạy | `docker compose up -d` rồi chạy lại `pytest` |
-
----
-
-## 10. Tái tạo báo cáo Word/PDF
-
-```bash
-python3.11 -m venv .venv-report
-./.venv-report/bin/python3.11 -m pip install -r docs/requirements.txt
-./.venv-report/bin/python3.11 -m playwright install chromium
-npm install --prefix .report-tools mermaid@12.0.0
-./.venv-report/bin/python3.11 docs/build_report.py
-```
-
-Script ghép `docs/bao-cao.md` với tài liệu 01–05, render Mermaid **cục bộ**, rồi xuất [Word](docs/BaoCao.docx) và [PDF](docs/BaoCao.pdf). Ảnh minh chứng và JUnit có sẵn trong `docs/report-assets/`; build báo cáo không chạy lại kiểm thử hay tự chụp lại giao diện. Khi cập nhật kết quả, cần chạy test/chụp minh chứng mới và sửa phần kiểm chứng trong nguồn báo cáo. Mã nhóm trên bìa: **11**.

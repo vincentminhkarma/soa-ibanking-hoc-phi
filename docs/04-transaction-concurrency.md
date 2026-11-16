@@ -94,17 +94,17 @@ flowchart TD
 
 ```mermaid
 sequenceDiagram
-    participant T1 as Giao dịch #1
+    participant T1 as Giao dịch T1
     participant DB as accounts (row user X)
-    participant T2 as Giao dịch #2
+    participant T2 as Giao dịch T2
 
     T1->>DB: BEGIN, SELECT ... FOR UPDATE
-    Note over DB: 🔒 khoá dòng
+    Note over DB: khoá dòng
     T2->>DB: BEGIN, SELECT ... FOR UPDATE
-    Note over T2: ⏳ bị chặn, phải chờ
+    Note over T2: bị chặn, phải chờ
     T1->>DB: balance(13tr) >= 13tr ✓ → balance = 0
     T1->>DB: INSERT ledger, COMMIT
-    Note over DB: 🔓 nhả khoá
+    Note over DB: nhả khoá
     DB-->>T2: balance = 0 (giá trị MỚI)
     T2->>DB: 0 >= 13tr ✗
     T2-->>T2: 409 INSUFFICIENT_FUNDS, ROLLBACK
@@ -134,14 +134,14 @@ sequenceDiagram
     end
 
     A->>TUI: SELECT ... FOR UPDATE → UNPAID
-    Note over TUI: 🔒 khoá dòng học phí
+    Note over TUI: khoá dòng học phí
     B->>TUI: SELECT ... FOR UPDATE
-    Note over B: ⏳ chờ
+    Note over B: chờ
     A->>TUI: UNPAID → PAID (payment_ref = A), COMMIT
     TUI-->>B: status = PAID (của giao dịch A)
     B-->>B: 409 TUITION_ALREADY_PAID
     B->>ACC: credit 1.000.000 (ref = payment_B:refund)
-    Note over B: 💰 hoàn tiền — số dư B trở về như trước
+    Note over B: hoàn tiền — số dư B trở về như trước
 ```
 
 **Kết quả bắt buộc:** khoản học phí `PAID` đúng một lần với `payment_ref` của người thắng; người thua nhận `409 TUITION_ALREADY_PAID`, giao dịch `FAILED` và **số dư không đổi** nhờ bút toán hoàn tiền.

@@ -21,9 +21,9 @@
 
 ```mermaid
 flowchart LR
-    user(("👤<br/>Người dùng<br/>iBanking"))
-    mail(("✉️<br/>Hệ thống<br/>Email"))
-    edu(("🎓<br/>Hệ thống<br/>Đào tạo"))
+    user(("Người dùng<br/>iBanking"))
+    mail(("Hệ thống<br/>Email"))
+    edu(("Hệ thống<br/>Đào tạo"))
 
     subgraph SYS["Phân hệ đóng học phí — iBanking"]
         direction TB

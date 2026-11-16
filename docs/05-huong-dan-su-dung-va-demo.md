@@ -87,7 +87,7 @@ Vẫn tài khoản `minhnguyen`, tra cứu `522H0002` → thanh toán hộ. Ch�
 - Bấm **Gửi lại mã**, dùng mã cũ → bị từ chối.
 - Tra cứu `522H0004` (đã đóng) → hệ thống chặn ngay từ bước tra cứu.
 
-### Màn 5 — Concurrency 5.1 và 5.2 (3 phút) ⭐
+### Màn 5 — Concurrency 5.1 và 5.2 (3 phút)
 ```bash
 pytest tests/test_03_concurrency.py -v
 ```
@@ -123,7 +123,7 @@ Mở <http://localhost:8004/docs> (payment-service) — Swagger sinh tự độn
 
 ---
 
-## 5.4. Câu hỏi thường gặp khi bảo vệ
+## 5.4. Câu hỏi thường gặp
 
 **Hỏi: Vì sao không dùng một transaction duy nhất cho cả hệ thống?**
 Mỗi service có database riêng nên không thể dùng một transaction ACID xuyên service. Hệ thống dùng saga có bù trừ: mỗi bước là một transaction cục bộ ACID, nếu bước sau hỏng thì hoàn tác bước trước bằng nghiệp vụ nghịch đảo (hoàn tiền). Xem [04-transaction-concurrency.md](04-transaction-concurrency.md).
