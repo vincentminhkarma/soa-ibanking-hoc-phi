@@ -3,10 +3,20 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import jwt
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Security
+from fastapi.security import APIKeyHeader
 
 from .config import INTERNAL_TOKEN, JWT_ALG, JWT_EXPIRES_MIN, JWT_SECRET
 from .errors import APIError
+
+# Swagger UI bỏ qua tham số header tên "Authorization" (luật OpenAPI), nên khai báo thành
+# security scheme: trang /docs có nút Authorize, dán "Bearer <access_token>" một lần cho mọi endpoint.
+bearer_header = APIKeyHeader(
+    name="Authorization",
+    scheme_name="Bearer",
+    description="Nhập: Bearer <access_token> (lấy từ POST /api/v1/auth/login)",
+    auto_error=False,
+)
 
 
 @dataclass(frozen=True)
@@ -47,7 +57,7 @@ def decode_token(token: str) -> dict:
         raise APIError(401, "INVALID_TOKEN", "Token không hợp lệ.")
 
 
-def current_user(authorization: str | None = Header(default=None)) -> CurrentUser:
+def current_user(authorization: str | None = Security(bearer_header)) -> CurrentUser:
     """Dependency cho API công khai.
 
     Mỗi service tự verify JWT (zero-trust) thay vì tin header do gateway gắn vào.

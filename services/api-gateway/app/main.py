@@ -109,11 +109,6 @@ def services() -> dict:
     }
 
 
-@app.api_route(
-    "/api/v1/{path:path}",
-    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-    summary="Proxy tới microservice tương ứng",
-)
 async def proxy(path: str, request: Request) -> Response:
     segment = path.split("/", 1)[0]
     target = ROUTES.get(segment)
@@ -150,4 +145,16 @@ async def proxy(path: str, request: Request) -> Response:
         status_code=upstream.status_code,
         headers={k: v for k, v in upstream.headers.items() if k.lower() not in HOP_BY_HOP},
         media_type=upstream.headers.get("content-type"),
+    )
+
+
+# Mỗi method một route để OpenAPI có operationId riêng. Một api_route chung 5 method sinh
+# operationId trùng nhau, khiến Swagger UI gửi nhầm method (bấm Execute ở GET mà request đi PATCH).
+for _method in ("GET", "POST", "PUT", "PATCH", "DELETE"):
+    app.add_api_route(
+        "/api/v1/{path:path}",
+        proxy,
+        methods=[_method],
+        summary="Proxy tới microservice tương ứng",
+        operation_id=f"proxy_{_method.lower()}",
     )

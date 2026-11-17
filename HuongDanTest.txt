@@ -1,0 +1,304 @@
+HƯỚNG DẪN CHẠY, TEST VÀ DEMO DỰ ÁN iBANKING
+===========================================
+
+Các lệnh chạy trong Terminal đã mở tại thư mục dự án, không cần cd.
+Chỉ copy dòng lệnh cần dùng, không chạy toàn bộ file theo thứ tự máy móc.
+Mở Docker Desktop và đợi Docker sẵn sàng trước khi chạy hệ thống.
+
+1. CÀI ĐẶT LẦN ĐẦU
+------------------
+bash setup.sh
+
+Tự kiểm tra Docker, giữ .env đang có hoặc tạo từ .env.example, build image,
+khởi chạy container và chờ sẵn sàng. Nếu có Python >= 3.11, script cài thư viện
+kiểm thử trong .venv và chạy script tạo lịch sử giao dịch mẫu.
+Cần mạng để tải image/thư viện lần đầu.
+
+Nếu cần tự tạo môi trường test (máy phải có Python 3.11):
+python3.11 -m venv .venv
+./.venv/bin/python -m pip install -r tests/requirements.txt
+
+Không cần activate .venv vì các lệnh bên dưới gọi trực tiếp Python trong đó.
+
+2. KHỞI CHẠY VÀ KIỂM TRA
+-----------------------
+Chạy lại hệ thống ở những lần sau, giữ nguyên dữ liệu:
+docker compose up -d --wait
+
+Sau khi sửa mã backend, build lại và chạy:
+docker compose up -d --build --wait
+
+Xem trạng thái container:
+docker compose ps
+
+Kiểm tra sáu service nghiệp vụ, mong đợi status UP:
+curl -s http://localhost:8080/health/services
+
+Kiểm tra riêng gateway:
+curl -s http://localhost:8080/health
+
+Địa chỉ:
+- Web: http://localhost:3000
+- Email OTP/biên lai (MailHog): http://localhost:8025
+- Swagger gateway: http://localhost:8080/docs
+- Swagger payment-service: http://localhost:8004/docs
+- Jaeger tracing: http://localhost:16686
+
+3. DEMO THANH TOÁN TRÊN WEB
+--------------------------
+Tài khoản chính: minhnguyen, thuha, quocbao, itdu.
+Mật khẩu chung: 123456.
+
+Dữ liệu gốc:
+- minhnguyen: 50.000.000 đồng.
+- thuha: 20.000.000 đồng.
+- quocbao: 15.000.000 đồng.
+- itdu: 1.000.000 đồng.
+- 522H0001: học phí 9.500.000 đồng, chưa đóng.
+- 522H0002: học phí 8.750.000 đồng, chưa đóng.
+- 522H0003: học phí 10.200.000 đồng, chưa đóng.
+- 522H0004: học phí 7.300.000 đồng, đã đóng.
+- 522H0005: học phí 11.000.000 đồng, chưa đóng.
+Số dư/trạng thái thực tế có thể khác sau khi test hoặc demo.
+
+Luồng: đăng nhập -> tra cứu MSSV chưa đóng -> đồng ý điều khoản -> tạo giao dịch
+-> lấy OTP trong MailHog -> xác nhận -> xem kết quả và lịch sử giao dịch.
+OTP gửi đến email người nộp tiền, không phải email sinh viên được thanh toán hộ.
+OTP có hạn 5 phút, dùng một lần; gửi lại mã làm mã cũ mất hiệu lực.
+
+4. CHẠY TEST TỰ ĐỘNG
+-------------------
+Chỉ unit test không cần Docker:
+./.venv/bin/python -m pytest tests/unit -v
+
+Toàn bộ test, cần hệ thống đang chạy:
+./.venv/bin/python -m pytest -v
+
+Test 01 - Đăng nhập, tra cứu, luồng thanh toán và các ràng buộc nghiệp vụ:
+./.venv/bin/python -m pytest tests/test_01_payment_flow.py -v
+
+Test 02 - OTP sai, dùng một lần, gửi lại, khóa số lần thử và thời hạn:
+./.venv/bin/python -m pytest tests/test_02_otp.py -v
+
+Test 03 - Hai tình huống đồng thời và xác nhận trùng lặp:
+./.venv/bin/python -m pytest tests/test_03_concurrency.py -v
+
+Test 04 - Đối soát, phục hồi giao dịch và khóa xử lý:
+./.venv/bin/python -m pytest tests/test_04_reconciliation.py -v
+
+Test 05 - Distributed tracing qua Jaeger:
+./.venv/bin/python -m pytest tests/test_05_tracing.py -v
+
+Test 06 - Mất phản hồi sau commit, hoàn tiền và phục hồi saga:
+./.venv/bin/python -m pytest tests/test_06_saga_recovery.py -v
+
+Test 07 - Migration schema và idempotency của sổ cái:
+./.venv/bin/python -m pytest tests/test_07_migration_and_idempotency.py -v
+
+Chạy test 06 và 07 cùng một lượt:
+./.venv/bin/python -m pytest tests/test_06_saga_recovery.py tests/test_07_migration_and_idempotency.py -v
+
+Dừng ngay khi gặp lỗi đầu tiên, hiện traceback ngắn:
+./.venv/bin/python -m pytest -x --tb=short -v
+
+Lưu kết quả của một lượt chạy vào file XML:
+./.venv/bin/python -m pytest -v --junitxml=test-results-local.xml
+
+Cách đọc kết quả:
+- PASSED: các điều kiện kiểm tra trong test đều đạt.
+- FAILED: kiểm tra không đạt; đọc traceback và assertion phía dưới.
+- ERROR: lỗi chuẩn bị test hoặc lỗi thu thập/import, chưa hẳn lỗi nghiệp vụ.
+- SKIPPED: ca được bỏ qua theo điều kiện; test OTP hết hạn mặc định được skip.
+- Lệnh thông thường chỉ in kết quả Terminal, không tự tạo file báo cáo.
+
+5. TRỌNG ĐIỂM: NHIỀU GIAO DỊCH TRÊN MỘT TÀI KHOẢN
+------------------------------------------------
+./.venv/bin/python -m pytest tests/test_03_concurrency.py::test_51_nhieu_giao_dich_tren_cung_mot_tai_khoan -v
+
+Chức năng:
+- Dùng quocbao, nạp thêm 12 triệu rồi đọc số dư hiện tại B.
+- Tạo hai khoản học phí mới, MSSV CA... và CB..., mỗi khoản bằng B.
+- Chuẩn bị hai giao dịch/OTP rồi gửi hai xác nhận qua hai worker thread.
+
+Kiểm tra bắt buộc:
+- Đúng một giao dịch thành công.
+- Giao dịch còn lại lỗi INSUFFICIENT_FUNDS.
+- Số dư cuối bằng 0; một khoản PAID, khoản kia UNPAID.
+- Không cố định CA hay CB thắng.
+
+Xem trên web:
+- Đăng nhập quocbao / 123456, tải lại trang.
+- Xem số dư 0, nếu chưa có thao tác khác sau test.
+- Vào Lịch sử giao dịch, tìm hai MSSV CA... và CB... theo thời gian chạy.
+- Xem Chi tiết: một thành công, một thất bại do thiếu số dư.
+- Bên bị chặn trừ tiền không cần hoàn tiền.
+
+Giải thích: khóa dòng tài khoản và kiểm tra lại số dư khi trừ tiền ngăn hai
+request cùng tiêu một số dư, dù cả hai giao dịch được tạo lúc còn đủ tiền.
+
+6. TRỌNG ĐIỂM: NHIỀU TÀI KHOẢN CÙNG ĐÓNG MỘT KHOẢN HỌC PHÍ
+---------------------------------------------------------
+./.venv/bin/python -m pytest tests/test_03_concurrency.py::test_52_nhieu_tai_khoan_thanh_toan_cung_mot_hoc_phi -v
+
+Chức năng:
+- Dùng minhnguyen và thuha; nạp thêm 2 triệu cho mỗi tài khoản.
+- Tạo một khoản học phí mới 1 triệu, MSSV CS...
+- Mỗi tài khoản tạo một giao dịch riêng cho cùng khoản học phí.
+- Chuẩn bị hai OTP rồi gửi hai xác nhận qua hai worker thread.
+
+Kiểm tra bắt buộc:
+- Đúng một giao dịch thành công, người thắng bị trừ 1 triệu.
+- Giao dịch còn lại nhận TUITION_ALREADY_PAID.
+- Người thua trở về số dư ngay trước khi xác nhận, có CREDIT hoàn tiền.
+- Khoản học phí PAID, tham chiếu đúng mã giao dịch thắng.
+- Không cố định minhnguyen hay thuha thắng.
+
+Xem trên web:
+- Mở minhnguyen và thuha ở Chrome thường + ẩn danh, hoặc hai trình duyệt.
+- Tải lại trang, vào Lịch sử giao dịch.
+- Tìm hai giao dịch 1 triệu cùng MSSV CS..., khác mã giao dịch.
+- Người thắng: thành công, có ghi nợ.
+- Người thua: thất bại; xem Chi tiết/saga trace và biến động số dư để thấy hoàn tiền.
+- Khi so số dư, nhớ test đã nạp thêm 2 triệu cho mỗi người trước khi xác nhận.
+
+Giải thích: học phí chỉ được gạch nợ một lần; giao dịch thua được saga hoàn
+lại khoản tiền đã trừ và có bút toán để đối chiếu.
+
+Chạy riêng đúng hai ca trọng điểm (mong đợi 2 passed):
+./.venv/bin/python -m pytest tests/test_03_concurrency.py::test_51_nhieu_giao_dich_tren_cung_mot_tai_khoan tests/test_03_concurrency.py::test_52_nhieu_tai_khoan_thanh_toan_cung_mot_hoc_phi -v
+
+Ca bổ sung: xác nhận cùng giao dịch ba lần concurrent, chỉ trừ tiền một lần:
+./.venv/bin/python -m pytest tests/test_03_concurrency.py::test_xac_nhan_trung_lap_khong_tru_tien_hai_lan -v
+
+7. DEMO THỦ CÔNG HAI TÌNH HUỐNG
+------------------------------
+Luôn dùng hai phiên độc lập: Chrome thường + ẩn danh hoặc Chrome + Safari.
+Hai tab thường không phải hai phiên độc lập. Không đăng xuất phiên A để đổi B.
+
+Một tài khoản, hai giao dịch:
+- Cả hai phiên đăng nhập quocbao.
+- Ví dụ số dư 15 triệu; hai khoản UNPAID là 9,5 triệu và 8,75 triệu.
+- Phiên A tra cứu khoản thứ nhất, phiên B tra cứu khoản thứ hai.
+- Tạo cả hai giao dịch, lấy đúng OTP từng giao dịch, nhập nhưng chưa xác nhận.
+- Hai người bấm xác nhận gần nhau.
+- Kỳ vọng một thành công, một thiếu số dư; số dư không âm.
+- Không cần số dư cuối bằng 0 trong demo này vì mỗi khoản không bằng toàn bộ số dư.
+
+Hai tài khoản, một khoản học phí:
+- Phiên A đăng nhập minhnguyen, phiên B đăng nhập thuha.
+- Cả hai đủ tiền và tra cứu cùng một khoản UNPAID, ví dụ 522H0005 nếu chưa đóng.
+- Tạo cả hai giao dịch, nhập đúng OTP mỗi người, sau đó xác nhận gần nhau.
+- Kỳ vọng chỉ một thanh toán thành công, bên còn lại không mất tiền ròng.
+
+Quan trọng:
+- Tạo xong CẢ HAI giao dịch trước khi xác nhận bất kỳ OTP nào.
+- Cùng tài khoản sẽ nhận hai email cùng địa chỉ: đối chiếu mã giao dịch trong email.
+- Bấm tay không bảo đảm request chồng lấn; dùng test tự động cho minh chứng concurrent.
+- Hai worker thread cũng không bảo đảm bắt đầu đúng cùng một mili giây.
+- PASSED chứng minh assertion đạt, không tự chứng minh chồng lấn ở một bước cụ thể.
+- Muốn xem thời gian: Jaeger -> api-gateway -> tìm hai request confirm lúc chạy.
+- Chồng lấn khi request sau bắt đầu trước lúc request trước kết thúc.
+- Trace Jaeger lưu trong bộ nhớ, có thể mất khi khởi động lại Jaeger.
+
+8. TEST RIÊNG OTP HẾT HẠN (TÙY CHỌN)
+----------------------------------
+Chỉ làm khi không có người đang demo OTP. Giảm TTL còn 8 giây:
+OTP_TTL_SECONDS=8 docker compose up -d --no-deps --wait otp-service
+
+Chạy ca hết hạn:
+OTP_TTL_SECONDS=8 ./.venv/bin/python -m pytest tests/test_02_otp.py::test_otp_het_han_bi_tu_choi -v
+
+Luôn trả về cấu hình .env sau khi thử, kể cả test lỗi:
+docker compose up -d --no-deps --wait otp-service
+
+TTL mặc định là 300 giây; nếu .env đã sửa thì lệnh cuối dùng giá trị trong .env.
+
+9. XEM LOG KHI GẶP LỖI
+---------------------
+Log gần nhất của toàn hệ thống:
+docker compose logs --tail=100
+
+Theo dõi xử lý thanh toán:
+docker compose logs -f payment-service
+
+Kiểm tra gửi OTP/email:
+docker compose logs --tail=100 otp-service notification-service mailhog
+
+Kiểm tra gateway:
+docker compose logs --tail=100 api-gateway
+
+Ctrl+C chỉ thoát màn hình theo dõi log, không dừng container.
+Nếu cổng bị chiếm: xác định tiến trình/container giữ cổng trước khi dừng nó.
+Nếu không có OTP: kiểm tra đúng email/giao dịch trong MailHog và trạng thái container.
+Nếu test báo hệ thống chưa sẵn sàng: chạy up --wait và kiểm tra health/services.
+Lỗi editor Cannot find module common.errors không đồng nghĩa test runtime thất bại;
+pytest có cấu hình đường dẫn import riêng. Cần xử lý cấu hình editor riêng nếu còn báo.
+
+10. DỪNG VÀ RESET DỮ LIỆU
+------------------------
+Dừng, giữ nguyên dữ liệu:
+docker compose stop
+
+Chạy lại, giữ dữ liệu:
+docker compose up -d --wait
+
+CẢNH BÁO: hai lệnh sau XÓA toàn bộ database demo hiện tại và tạo lại dữ liệu gốc.
+Mất giao dịch, số dư đã sửa và dữ liệu test. Chỉ dùng nếu chấp nhận mất dữ liệu:
+docker compose down -v
+docker compose up -d --wait
+
+Muốn có thêm lịch sử giao dịch mẫu của các tài khoản phụ, chạy sau khi hệ thống UP:
+./.venv/bin/python scripts/seed_demo.py
+
+Sau reset: đăng xuất/đăng nhập lại web, Refresh dữ liệu DBeaver.
+Restart, stop hoặc down không kèm -v không đặt database về dữ liệu gốc.
+Không reset hoặc sửa DB trong lúc có test/giao dịch đang chạy.
+
+11. XEM DATABASE
+----------------
+DBeaver kết nối mặc định:
+Host localhost | Port 5433 | Database postgres | User ibanking | Password ibanking
+Nếu .env đã đổi user/password thì dùng cấu hình tương ứng.
+Bật Show all databases để xem đủ database.
+
+Các bảng thường dùng:
+- authdb -> public -> users: tài khoản, thông tin người dùng.
+- accountdb -> public -> accounts: số dư; ledger_entries: ghi nợ/ghi có.
+- tuitiondb -> public -> students: sinh viên; tuition_fees: học phí.
+- paymentdb: giao dịch và các bước xử lý.
+Nhấp phải bảng -> View Data -> All Rows.
+
+Mở psql có sẵn trong Docker, không cần cài psql trên Mac:
+docker compose exec postgres sh -c 'psql -U "$POSTGRES_USER" -d postgres'
+
+Các lệnh sau chỉ gõ SAU KHI đã vào psql:
+\l
+\c tuitiondb
+\dt
+SELECT student_code, amount, status FROM tuition_fees ORDER BY student_code;
+\q
+
+Nguồn dữ liệu gốc:
+- services/auth-service/app/seed.py
+- services/account-service/app/seed.py
+- services/tuition-service/app/seed.py
+- scripts/seed_demo.py
+
+Không nhập mật khẩu plaintext vào password_hash.
+Sửa balance trực tiếp không tạo sổ cái; chỉ phù hợp chuẩn bị điều kiện demo.
+Không chỉ đổi PAID thành UNPAID để reset giao dịch: dữ liệu còn ở database khác.
+Không sửa ID, sổ cái hoặc trạng thái payment tùy tiện khi có giao dịch đang xử lý.
+
+12. THỨ TỰ GỢI Ý KHI BÁO CÁO
+---------------------------
+1) Chạy hệ thống, kiểm tra docker compose ps và health/services.
+2) Demo web: đăng nhập, tra cứu, OTP và thanh toán thành công.
+3) Demo ràng buộc: thiếu số dư, học phí đã đóng, OTP sai.
+4) Chạy riêng test 51, mở quocbao xem kết quả.
+5) Chạy riêng test 52, mở minhnguyen/thuha xem kết quả và hoàn tiền.
+6) Nếu cần, chạy test 04/06 về phục hồi, test 05 về tracing, test 07 về idempotency.
+7) Chạy toàn bộ test sau cùng vì test làm thay đổi dữ liệu demo.
+
+Các integration test dùng chung tài khoản: không chạy nhiều tiến trình test song song,
+không vừa chạy test vừa thanh toán thủ công. Test tự tạo khoản học phí mới nên thường
+không cần reset trước mỗi lượt. Sau khi reset phải tạo lại mọi giao dịch đang định demo.
